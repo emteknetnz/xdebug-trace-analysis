@@ -122,12 +122,21 @@ foreach (explode("\n", file_get_contents($f)) as $r) {
     }
 }
 
+$no_returns = [];
+
 foreach ($prev as $iden => $data) {
     if (array_key_exists('return_type', $data)) {
         continue;
     }
+    // could be either:
+    // - no return in function
+    // - return $this;
     echo "$iden\n";
     $prev[$iden]['return_type'] = 'unknown';
+    $cml = "$class::$method:$line_number";
+    if (!in_array($cml, $no_returns)) {
+        $no_returns[] = $cml;
+    }
 }
 
 $things = [];
@@ -151,6 +160,7 @@ foreach ($prev as $iden => $data) {
     }
 }
 //print_r($things);
+print_r($no_returns);
 
 // method calls without traced return (not sure how this is possible)
 
