@@ -13,32 +13,42 @@ foreach (explode("\n", trim(file_get_contents('.config'))) as $line) {
 
 $unknown_args = [];
 
-function get_arg_types($args) {
+$arg_type_break = 'variadic/default';
+
+function get_arg_type($arg) {
     global $unknown_args;
+    if ($arg == '???') {
+        // args = [???, 'abc', 123] < variadic
+        // args = ['def', ???] < using default param for 2nd arg
+        return 'variadic/default'; // TODO separate
+    } elseif (substr($arg, 0, 1) == '[') {
+        return 'array';
+    } elseif (substr($arg, 0, 1) == "'") {
+        return 'string';
+    } elseif ($arg === '0' || preg_match('#^-?[1-9]+[0-9]*$#', $arg)) {
+        return 'int';
+    } elseif (preg_match('#^-?[0-9\.]+$#', $arg) && substr_count($arg, '.') == 1) {
+        return 'float';
+    } elseif ($arg == 'TRUE' || $arg == 'FALSE') {
+        return 'bool';
+    } elseif ($arg == 'NULL') {
+        return 'null';
+    } elseif (preg_match('#^class ([A-Za-z0-9_\\\]+) {#', $arg, $m)) {
+        return $m[1];
+    } else {
+        $unknown_args[] = $arg;
+        return 'unknown';
+    }
+}
+
+function get_arg_types($args) {
+    global $arg_type_break;
     $arg_types = [];
     foreach ($args as $arg) {
-        if ($arg == '???') {
-            // args = [???, 'abc', 123] < variadic
-            // args = ['def', ???] < using default param for 2nd arg
-            $arg_types[] = 'variadic/default'; // TODO separate
+        $arg_type = get_arg_type($arg);
+        $arg_types[] = $arg_type;
+        if ($arg_type == $arg_type_break) {
             break;
-        } elseif (substr($arg, 0, 1) == '[') {
-            $arg_types[] = 'array';
-        } elseif (substr($arg, 0, 1) == "'") {
-            $arg_types[] = 'string';
-        } elseif ($arg === '0' || preg_match('#^-?[1-9]+[0-9]*$#', $arg)) {
-            $arg_types[] = 'int';
-        } elseif (preg_match('#^-?[0-9\.]+$#', $arg) && substr_count($arg, '.') == 1) {
-            $arg_types[] = 'float';
-        } elseif ($arg == 'TRUE' || $arg == 'FALSE') {
-            $arg_types[] = 'bool';
-        } elseif ($arg == 'NULL') {
-            $arg_types[] = 'null';
-        } elseif (preg_match('#^class ([A-Za-z0-9_\\\]+) {#', $arg, $m)) {
-            $arg_types[] = $m[1];
-        } else {
-            $arg_types[] = 'unknown';
-            $unknown_args[] = $arg;
         }
     }
     return $arg_types;
@@ -118,7 +128,7 @@ foreach (explode("\n", file_get_contents($f)) as $r) {
         if (!isset($prev[$iden]['method'])) {
             continue;
         }
-        $prev[$iden]['return_type'] = get_arg_types([$a[6]])[0];
+        $prev[$iden]['return_type'] = get_arg_type($a[6]);
     }
 }
 
@@ -128,11 +138,14 @@ foreach ($prev as $iden => $data) {
     if (array_key_exists('return_type', $data)) {
         continue;
     }
-    // could be either:
-    // - no return in function
+    // return type could be either:
+    // - no return statement in function
     // - return $this;
-    echo "$iden\n";
-    $prev[$iden]['return_type'] = 'unknown';
+    // echo "$iden\n";
+    $prev[$iden]['return_type'] = 'no-return-or-return-this';
+    $class = $data['class'];
+    $method = $data['method'];
+    $line_number = $data['line_number'];
     $cml = "$class::$method:$line_number";
     if (!in_array($cml, $no_returns)) {
         $no_returns[] = $cml;
@@ -148,19 +161,19 @@ foreach ($prev as $iden => $data) {
     $return_type = $data['return_type'];
     $cml = "$class::$method:$line_number";
     $things[$cml] ??= ['arg_types' => [], 'return_types' => []];
+    if (!in_array($return_type, $things[$cml]['return_types'])) {
+        $things[$cml]['return_types'][] = $return_type;
+    }
     for ($i = 0; $i < count($arg_types); $i++) {
         $arg_type = $arg_types[$i];
         $things[$cml]['arg_types'][$i] ??= [];
         if (!in_array($arg_type, $things[$cml]['arg_types'][$i])) {
             $things[$cml]['arg_types'][$i][] = $arg_type;
         }
-        if (!in_array($return_type, $things[$cml]['return_types'])) {
-            $things[$cml]['return_types'][] = $return_type;
-        }
     }
 }
-//print_r($things);
-print_r($no_returns);
+print_r($things);
+// print_r($no_returns);
 
 // method calls without traced return (not sure how this is possible)
 
