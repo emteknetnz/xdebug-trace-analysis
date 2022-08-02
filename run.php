@@ -18,7 +18,9 @@ function get_arg_types($args) {
     $arg_types = [];
     foreach ($args as $arg) {
         if ($arg == '???') {
-            $arg_types[] = 'variadic';
+            // args = [???, 'abc', 123] < variadic
+            // args = ['def', ???] < using default param for 2nd arg
+            $arg_types[] = 'variadic/default'; // TODO separate
             break;
         } elseif (substr($arg, 0, 1) == '[') {
             $arg_types[] = 'array';
@@ -54,6 +56,7 @@ foreach (explode("\n", file_get_contents($f)) as $r) {
     $level = $a[1];
     $function_num = $a[2];
     $iden = "$level-$function_num";
+    $iden = $function_num;
     $type = $a[3];
     // also a non-record line
     if ($type == '') {
@@ -120,9 +123,10 @@ foreach (explode("\n", file_get_contents($f)) as $r) {
 }
 
 foreach ($prev as $iden => $data) {
-    if (isset($data['return_type'])) {
+    if (array_key_exists('return_type', $data)) {
         continue;
     }
+    echo "$iden\n";
     $prev[$iden]['return_type'] = 'unknown';
 }
 
@@ -146,7 +150,7 @@ foreach ($prev as $iden => $data) {
         }
     }
 }
-print_r($things);
+//print_r($things);
 
 // method calls without traced return (not sure how this is possible)
 
