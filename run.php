@@ -15,12 +15,12 @@ $unknown_args = [];
 
 $arg_type_break = 'variadic/default';
 
-function get_arg_type($arg) {
+function get_arg_type($arg, $next_arg) {
     global $unknown_args;
     if ($arg == '???') {
         // args = [???, 'abc', 123] < variadic
         // args = ['def', ???] < using default param for 2nd arg
-        return 'variadic/default'; // TODO separate
+        return is_null($next_arg) || $next_arg == '???' ? 'default' : 'variadic';
     } elseif (substr($arg, 0, 1) == '[') {
         return 'array';
     } elseif (substr($arg, 0, 1) == "'") {
@@ -44,8 +44,11 @@ function get_arg_type($arg) {
 function get_arg_types($args) {
     global $arg_type_break;
     $arg_types = [];
-    foreach ($args as $arg) {
-        $arg_type = get_arg_type($arg);
+    $arg_count = count($args);
+    for ($i = 0; $i < $arg_count; $i++) {
+        $arg = $args[$i];
+        $next_arg = $args[$i] ?? null;
+        $arg_type = get_arg_type($arg, $next_arg);
         $arg_types[] = $arg_type;
         if ($arg_type == $arg_type_break) {
             break;
@@ -128,19 +131,19 @@ foreach (explode("\n", file_get_contents($f)) as $r) {
         if (!isset($prev[$iden]['method'])) {
             continue;
         }
-        $prev[$iden]['return_type'] = get_arg_type($a[6]);
+        $prev[$iden]['return_type'] = get_arg_type($a[6], null);
     }
 }
 
+// return type seems to be either:
+// - no return statement in function
+// - return $this;
 $no_returns = [];
 
 foreach ($prev as $iden => $data) {
     if (array_key_exists('return_type', $data)) {
         continue;
     }
-    // return type could be either:
-    // - no return statement in function
-    // - return $this;
     // echo "$iden\n";
     $prev[$iden]['return_type'] = 'no-return-or-return-this';
     $class = $data['class'];
@@ -152,7 +155,7 @@ foreach ($prev as $iden => $data) {
     }
 }
 
-$things = [];
+$out = [];
 foreach ($prev as $iden => $data) {
     $class = $data['class'];
     $method = $data['method'];
@@ -160,21 +163,31 @@ foreach ($prev as $iden => $data) {
     $arg_types = $data['arg_types'];
     $return_type = $data['return_type'];
     $cml = "$class::$method:$line_number";
-    $things[$cml] ??= ['arg_types' => [], 'return_types' => []];
-    if (!in_array($return_type, $things[$cml]['return_types'])) {
-        $things[$cml]['return_types'][] = $return_type;
+    $out[$cml] ??= ['arg_types' => [], 'return_types' => []];
+    if (!in_array($return_type, $out[$cml]['return_types'])) {
+        $out[$cml]['return_types'][] = $return_type;
     }
     for ($i = 0; $i < count($arg_types); $i++) {
         $arg_type = $arg_types[$i];
-        $things[$cml]['arg_types'][$i] ??= [];
-        if (!in_array($arg_type, $things[$cml]['arg_types'][$i])) {
-            $things[$cml]['arg_types'][$i][] = $arg_type;
+        $out[$cml]['arg_types'][$i] ??= [];
+        if (!in_array($arg_type, $out[$cml]['arg_types'][$i])) {
+            $out[$cml]['arg_types'][$i][] = $arg_type;
         }
     }
 }
-print_r($things);
-// print_r($no_returns);
+#print_r($out);
+foreach (array_keys($out) as $cml) {
+    list($class, $ml) = explode('::', $cml);
+    list($method, $line) = explode(':', $ml);
+    foreach ($out[$cml]['arg_types'] as $arg_types) {
+        foreach ($arg_types as $arg_type) {
+            if ($arg_type == 'variadic') {
+                var_dump([$cml, $out[$cml]]);
+                die;
+            }
+        }
+    }
+}
 
-// method calls without traced return (not sure how this is possible)
-
-// print_r(array_keys($prev)); // << at there func calls i care about without return types?
+# method calls without traced return (not sure how this is possible)
+#print_r(array_keys($prev)); // << at there func calls i care about without return types?
