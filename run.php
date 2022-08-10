@@ -176,18 +176,15 @@ foreach ($prev as $iden => $data) {
     }
 }
 #print_r($out);
-foreach (array_keys($out) as $cml) {
-    list($class, $ml) = explode('::', $cml);
-    list($method, $line) = explode(':', $ml);
-    foreach ($out[$cml]['arg_types'] as $arg_types) {
-        foreach ($arg_types as $arg_type) {
-            if ($arg_type == 'variadic') {
-                var_dump([$cml, $out[$cml]]);
-                die;
-            }
-        }
-    }
-}
-
-# method calls without traced return (not sure how this is possible)
-#print_r(array_keys($prev)); // << at there func calls i care about without return types?
+// foreach (array_keys($out) as $cml) {
+//     list($class, $ml) = explode('::', $cml);
+//     list($method, $line) = explode(':', $ml);
+//     foreach ($out[$cml]['arg_types'] as $arg_types) {
+//         foreach ($arg_types as $arg_type) {
+//             if ($arg_type == 'variadic') {
+//                 var_dump([$cml, $out[$cml]]);
+//                 die;
+//             }
+//         }
+//     }
+// }
